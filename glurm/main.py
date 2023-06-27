@@ -2,13 +2,11 @@ import argparse
 import subprocess
 import re
 
-### config
-project = 'tesorai-390809'
-zone = 'us-central1-a'
-
 def run():
     parser = argparse.ArgumentParser()
     parser.add_argument('--cmd')
+    parser.add_argument('--project', default='tesorai-390809')
+    parser.add_argument('--zone', default='us-central1-a')
     parser.add_argument('--machine-type', default='e2-micro')
     args = parser.parse_args()
 
@@ -16,7 +14,12 @@ def run():
     for i in range(1, 1_000):
         if i not in instances:
             break
-    subprocess.call(create_instance_cmd(f'glurm-{i}', args.machine_type), shell=True)
+    name = f'glurm-{i}'
+    delete_cmd = f'gcloud compute instances delete {name} --zone {args.zone} -q'
+    s = create_instance_cmd(name, args.project, args.zone, args.machine_type)
+    s += f" --metadata=startup-script='#! /bin/bash\n\n{args.cmd}\n\n{delete_cmd}'"
+    subprocess.call(s, shell=True)
+
 
 def cancel():
     parser = argparse.ArgumentParser()
@@ -46,7 +49,7 @@ def get_instances():
         instances[id] = dict(id=id, name=name, zone=zone)
     return instances
 
-def create_instance_cmd(name, machine_type):
+def create_instance_cmd(name, project, zone, machine_type):
     return f'''gcloud compute instances create {name} \
     --project={project} \
     --zone={zone} \
